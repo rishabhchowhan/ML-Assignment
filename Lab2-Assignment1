@@ -1,0 +1,184 @@
+
+# coding: utf-8
+
+# In[1]:
+
+import tensorflow as tf
+import numpy as np
+rng = np.random
+
+import matplotlib.pyplot as plt
+learning_rate = 0.0001
+training_epochs = 1000
+display_step = 50
+
+
+# In[2]:
+
+with tf.name_scope("Creation_of_array"):
+    x_array=np.asarray([2.0,9.4,3.32,0.88,-2.23,1.11,0.57,-2.25,-3.31,6.45])
+    y_array=np.asarray([1.22,0.34,-0.08,2.25,4.41,3.09,-6.66,-9.77,0.001,2.25])
+    x = tf.constant(x_array,dtype = tf.float32,name = "x_array")
+    y = tf.constant(y_array,dtype = tf.float32, name= "y_array")
+with tf.name_scope("Calculating_y_mean"):
+    mean_y = tf.reduce_mean(y, name = "mean_y")
+    with tf.Session() as sess:
+        result_y = sess.run(mean_y)
+        print(result_y)
+
+
+# In[3]:
+
+with tf.name_scope("Calculating_x_mean_and_x_variance"):
+    mean_x, variance = tf.nn.moments(x, [0], name = "mean_x_and_variance_x")
+    with tf.Session() as sess:
+        m, v = sess.run([mean_x, variance])
+        print(m)
+        print(v)
+
+
+# In[4]:
+
+with tf.name_scope("Calculating_covariance"):
+    def tensorflow_covariance(x_array,y_array,x_mean,y_mean):
+        cov = 0.0
+        for i in range(0,10):
+            x_val = tf.subtract(x_array[i],x_mean, name="Finding_difference_of_xval_and_mean")
+            y_val = tf.subtract(y_array[i],y_mean, name="Finding_difference_of_yval_and_mean")
+            total_val = tf.multiply(x_val,y_val, name="Multiplying_found_values")
+            cov = tf.add(cov,total_val, name="Recursive_addition")
+        return cov/10.0
+    with tf.Session() as sess:
+        covar = sess.run(tensorflow_covariance(x,y,m,result_y))
+        print(covar)
+
+
+# In[5]:
+
+with tf.name_scope("Calculating_slope_m_and_c"):
+    slope = tf.div(covar,v,name="Finding_slope")
+    intm = tf.multiply(slope,m,name = "Intermediate_step")
+    c_intm = tf.subtract(result_y,intm,name = "Finding_c")
+
+    with tf.Session() as sess:
+        m_slope = sess.run(slope)
+        c = sess.run(c_intm)
+        print(m_slope)
+        print(c)
+
+
+# In[7]:
+
+with tf.name_scope("Plotting"):
+    n_samples = x_array.shape[0]
+    X = tf.placeholder("float")
+    Y = tf.placeholder("float")
+
+    # Set model weights
+    W = tf.Variable(rng.randn(), name="weight")
+    b = tf.Variable(rng.randn(), name="bias")
+
+    # Construct a linear model
+    pred = tf.add(tf.multiply(X, W), b)
+
+
+    # Mean squared error
+    cost = tf.reduce_sum(tf.pow(pred-Y, 2))/(2*n_samples)
+    # Gradient descent
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
+
+    # Initializing the variables
+    init = tf.global_variables_initializer()
+
+    # Launch the graph
+    with tf.Session() as sess:
+        sess.run(init)
+
+        # Fit all training data
+        for epoch in range(training_epochs):
+            for (p, r) in zip(x_array, y_array):
+                sess.run(optimizer, feed_dict={X: p, Y: r})
+
+            # Display logs per epoch step
+            if (epoch+1) % display_step == 0:
+                c = sess.run(cost, feed_dict={X: x_array, Y:y_array})
+                print("Epoch:", '%04d' % (epoch+1), "cost=", "{:.9f}".format(c),                     "W=", sess.run(W), "b=", sess.run(b))
+
+        print("Optimization Finished!")
+        training_cost = sess.run(cost, feed_dict={X: x_array, Y: y_array})
+        print("Training cost=", training_cost, "W=", sess.run(W), "b=", sess.run(b), '\n')
+
+        # Graphic display
+        plt.plot(x_array, y_array, 'ro', label='Original data')
+        plt.plot(x_array, sess.run(W) * x_array + sess.run(b), label='Fitted line')
+        plt.legend()
+        plt.show()
+
+
+# In[8]:
+
+with tf.name_scope("Finding_root_mean_square_error"):
+    rms = tf.sqrt(tf.reduce_mean(tf.squared_difference(x_array, y_array,name = "Finding_squared_difference"),name="Finding_mean"),name = "Finding_square_root")
+    with tf.Session() as sess:
+        rmse=sess.run(rms)
+        print(rmse)
+
+
+# In[9]:
+
+with tf.name_scope("Finding_theta_1"): 
+    y_var = tf.subtract(y,result_y,name = "Subtract_y_array_with_y_mean")
+    x_var = tf.subtract(x,m,name = "Subtract_x_array_with_x_mean")
+    mult = tf.multiply(x_var,y_var,name = "Multiply_calculated_arrays")
+    sumn = tf.reduce_sum(mult,name = "Find_sum_of_x_i_minus_mean_x_and_y_i_minus_mean_y")
+    x_var2 = tf.multiply(x_var,x_var,name = "Squaring_found_arrray_values")
+    sumd = tf.reduce_sum(x_var2,name = "Find_sum_of_array_of_x_i_minus_mean_x")
+    val = sumn/sumd
+
+    with tf.Session() as sess:
+        res = sess.run(val)
+        print(res)
+
+
+# In[10]:
+
+with tf.name_scope("Finding_theta_0"):    
+    temp = tf.multiply(res,m,name = "Multiply_res_with_slope")
+    theta = tf.subtract(result_y,temp,name="Sub_obtained_res_with_mean_y")
+    with tf.Session() as sess:
+        theta0 = sess.run(theta)
+        print(theta0)
+
+
+# In[11]:
+
+with tf.name_scope("Finding_predictions"):
+    mx = tf.multiply(res,x,name = "Multiply_res_with_x_array")
+    y_temp = tf.add(mx,theta0,name = "Add_m_multiplied_x_array_with_c")
+    with tf.Session() as sess:
+        y_new = sess.run(y_temp)
+        print(y_new)
+
+
+# In[12]:
+
+t_minus = tf.subtract(y_new,y,name = "Sub_new_preds_with_original_y")
+t_squared = tf.multiply(t_minus,t_minus,name= "Square_obtained_res")
+t_sum = tf.reduce_sum(t_squared,name="Find_array_sum")
+j_theta = tf.div(t_sum,20,name="Divide_by_no_of_elements")
+with tf.Session() as sess:
+    print(sess.run(j_theta))
+
+
+# In[13]:
+
+with tf.Session() as sess:
+    writer = tf.summary.FileWriter("/tmp/tboard/output_regg2", sess.graph)
+    print(sess.run(j_theta))
+    writer.close()
+
+
+# In[ ]:
+
+
+
